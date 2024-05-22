@@ -1,0 +1,131 @@
+version : "3"
+services :
+  signature_rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: infra-rabbitmq
+    ports:
+      - ${RABBITMQ_PORT}:5672
+      - ${RABBITMQ_GUI_PORT}:15672
+    network_mode: ${SIGNATURE_NETWORK}
+    restart: on-failure
+    environment:
+      - RABBITMQ_DEFAULT_USER:${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_DEFAULT_PASS:${RABBITMQ_DEFAULT_PASS}
+    volumes:
+      - ${RABBITMQ_CUSTOM_CONFIG_PATH}:/etc/rabbitmq
+      - ${RABBITMQ_DATA_PATH}:/var/lib/rabbitmq
+      - ${RABBITMQ_LOG_PATH}:/var/log/rabbitmq
+
+  signature_zookeeper1:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: infra-zookeeper1
+    environment:
+      ZOOKEEPER_SERVER_ID: 1
+      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_PORT1}
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 3
+    ports:
+      - ${ZOOKEEPER_PORT1}:${ZOOKEEPER_PORT1}
+    network_mode: ${SIGNATURE_NETWORK}
+
+  signature_zookeeper2:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: infra-zookeeper2
+    environment:
+      ZOOKEEPER_SERVER_ID: 2
+      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_PORT2}
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 3
+    ports:
+      - ${ZOOKEEPER_PORT2}:${ZOOKEEPER_PORT2}
+    network_mode: ${SIGNATURE_NETWORK}
+
+  signature_zookeeper3:
+    image: confluentinc/cp-zookeeper:latest
+    container_name: infra-zookeeper3
+    environment:
+      ZOOKEEPER_SERVER_ID: 3
+      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_PORT3}
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER_INIT_LIMIT: 5
+      ZOOKEEPER_SYNC_LIMIT: 3
+    ports:
+      - ${ZOOKEEPER_PORT3}:${ZOOKEEPER_PORT3}
+    network_mode: ${SIGNATURE_NETWORK}
+  
+  signature_kafka1:
+    image: confluentinc/cp-kafka:latest
+    container_name: infra-kafka1
+    ports:
+      - ${KAFKA_PORT1}:${KAFKA_PORT1}
+    network_mode: ${SIGNATURE_NETWORK}
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: infra-zookeeper1:${ZOOKEEPER_PORT1},infra-zookeeper2:${ZOOKEEPER_PORT2},infra-zookeeper3:${ZOOKEEPER_PORT3}
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://infra-kafka1:${KAFKA_PORT1}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT 
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_NUM_PARTITIONS: 3
+    depends_on:
+      - signature_zookeeper1
+      - signature_zookeeper2
+      - signature_zookeeper3
+
+  signature_kafka2:
+    image: confluentinc/cp-kafka:latest
+    container_name: infra-kafka2
+    ports:
+      - ${KAFKA_PORT2}:${KAFKA_PORT2}
+    network_mode: ${SIGNATURE_NETWORK}
+    environment:
+      KAFKA_BROKER_ID: 2
+      KAFKA_ZOOKEEPER_CONNECT: infra-zookeeper1:${ZOOKEEPER_PORT1},infra-zookeeper2:${ZOOKEEPER_PORT2},infra-zookeeper3:${ZOOKEEPER_PORT3}
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://infra-kafka2:${KAFKA_PORT2}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_NUM_PARTITIONS: 3
+    depends_on:
+      - signature_zookeeper1
+      - signature_zookeeper2
+      - signature_zookeeper3
+
+  signature_kafka3:
+    image: confluentinc/cp-kafka:latest
+    container_name: infra-kafka3
+    ports:
+      - ${KAFKA_PORT3}:${KAFKA_PORT3}
+    network_mode: ${SIGNATURE_NETWORK}
+    environment:
+      KAFKA_BROKER_ID: 3
+      KAFKA_ZOOKEEPER_CONNECT: infra-zookeeper1:${ZOOKEEPER_PORT1},infra-zookeeper2:${ZOOKEEPER_PORT2},infra-zookeeper3:${ZOOKEEPER_PORT3}
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://infra-kafka3:${KAFKA_PORT3}
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_DEFAULT_REPLICATION_FACTOR: 3
+      KAFKA_NUM_PARTITIONS: 3
+    depends_on:
+      - signature_zookeeper1
+      - signature_zookeeper2
+      - signature_zookeeper3
+
+  signature_kafka_ui:
+    image: provectuslabs/kafka-ui
+    container_name: infra-kafka-ui
+    ports:
+      - ${KAFKA_UI_PORT}:8080
+    network_mode: ${SIGNATURE_NETWORK}
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=signature
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=infra-kafka1:${KAFKA_PORT1},infra-kafka2:${KAFKA_PORT2},infra-kafka3:${KAFKA_PORT3}
+      - KAFKA_CLUSTERS_0_ZOOKEEPER=infra-zookeeper1:${ZOOKEEPER_PORT1},infra-zookeeper2:${ZOOKEEPER_PORT2},infra-zookeeper3:${ZOOKEEPER_PORT3}
+    depends_on:
+      - signature_zookeeper1
+      - signature_zookeeper2
+      - signature_zookeeper3
+      - signature_kafka1
+      - signature_kafka2
+      - signature_kafka3

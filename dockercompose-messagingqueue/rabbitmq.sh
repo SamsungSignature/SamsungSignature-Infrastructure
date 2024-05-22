@@ -1,0 +1,1 @@
+docker exec infra-rabbitmq rabbitmq-plugins enable rabbitmq_management
