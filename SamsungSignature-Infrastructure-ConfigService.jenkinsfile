@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+    
+    stages {
+        stage('CLONE') {
+            steps {
+                script {
+                    git branch: 'infra-dev-config', credentialsId: 'jenkins-gitlab', url: 'https://lab.ssafy.com/s10-final/S10P31A503.git'
+                }
+            }
+        }
+        stage('BUILD') {
+            steps {
+                script {
+                    sh '''
+                        cd INFRA-ConfigService
+                        chmod 755 gradlew
+                        ./gradlew clean bootjar
+                    '''
+                }
+            }
+        }
+        stage('SCP') {
+            steps {
+                sshagent(credentials: ['jenkins-ssh']) {
+                    sh'''
+                        ssh -o StrictHostKeyChecking=no ubuntu@43.201.50.220 '
+                            uptime
+                            rm -rf /home/ubuntu/scp/infra-config
+                            mkdir /home/ubuntu/scp/infra-config
+                        '
+                    '''
+                    sh 'scp -r . ubuntu@43.201.50.220:/home/ubuntu/scp/infra-config'
+                }
+            }
+        }
+        stage('DEPLOY') {
+            steps {
+                sshagent(credentials: ['jenkins-ssh']) {
+                    sh '''
+                        ssh ubuntu@43.201.50.220 '
+                            export CONFIG_SERVICE_PORT=8370
+                            cd /home/ubuntu/scp/infra-config/INFRA-ConfigService
+                            sh deploy.sh
+                        '
+                    '''
+                }
+            }
+        }
+    }
+    
+}

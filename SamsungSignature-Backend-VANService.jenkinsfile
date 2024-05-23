@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+    
+    stages {
+        stage('CLONE') {
+            steps {
+                script {
+                    git branch: 'be-dev-van', credentialsId: 'jenkins-gitlab', url: 'https://lab.ssafy.com/s10-final/S10P31A503.git'
+                }
+            }
+        }
+        stage('BUILD') {
+            steps {
+                script {
+                    sh '''
+                        cd BE-VANService
+                        chmod 755 gradlew
+                        ./gradlew clean bootjar
+                    '''
+                }
+            }
+        }
+        stage('SCP') {
+            steps {
+                sshagent(credentials: ['jenkins-ssh']) {
+                    sh'''
+                        ssh -o StrictHostKeyChecking=no ubuntu@43.201.50.220 '
+                            uptime
+                            rm -rf /home/ubuntu/scp/be-van
+                            mkdir /home/ubuntu/scp/be-van
+                        '
+                    '''
+                    sh 'scp -r . ubuntu@43.201.50.220:/home/ubuntu/scp/be-van'
+                }
+            }
+        }
+        stage('DEPLOY') {
+            steps {
+                sshagent(credentials: ['jenkins-ssh']) {
+                    sh '''
+                        ssh ubuntu@43.201.50.220 '
+                            export VAN_SERVICE_PORT=8340
+                            cd /home/ubuntu/scp/be-van/BE-VANService
+                            sh deploy.sh
+                        '
+                    '''
+                }
+            }
+        }
+    }
+    
+}

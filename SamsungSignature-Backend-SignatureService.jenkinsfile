@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+    
+    stages {
+        stage('CLONE') {
+            steps {
+                script {
+                    git branch: 'be-dev-signature', credentialsId: 'jenkins-gitlab', url: 'https://lab.ssafy.com/s10-final/S10P31A503.git'
+                }
+            }
+        }
+        stage('BUILD') {
+            steps {
+                script {
+                    sh '''
+                        cd BE-SignatureService
+                        chmod 755 gradlew
+                        ./gradlew clean bootjar
+                    '''
+                }
+            }
+        }
+        stage('SCP') {
+            steps {
+                sshagent(credentials: ['jenkins-ssh']) {
+                    sh'''
+                        ssh -o StrictHostKeyChecking=no ubuntu@43.201.50.220 '
+                            uptime
+                            rm -rf /home/ubuntu/scp/be-signature
+                            mkdir /home/ubuntu/scp/be-signature
+                        '
+                    '''
+                    sh 'scp -r . ubuntu@43.201.50.220:/home/ubuntu/scp/be-signature'
+                }
+            }
+        }
+        stage('DEPLOY') {
+            steps {
+                sshagent(credentials: ['jenkins-ssh']) {
+                    sh '''
+                        ssh ubuntu@43.201.50.220 '
+                            export SIGNATURE_SERVICE_PORT=8310
+                            cd /home/ubuntu/scp/be-signature/BE-SignatureService
+                            sh deploy.sh
+                        '
+                    '''
+                }
+            }
+        }
+    }
+    
+}

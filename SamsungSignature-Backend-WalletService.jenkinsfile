@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+    
+    stages {
+        stage('CLONE') {
+            steps {
+                script {
+                    git branch: 'be-dev-wallet', credentialsId: 'jenkins-gitlab', url: 'https://lab.ssafy.com/s10-final/S10P31A503.git'
+                }
+            }
+        }
+        stage('BUILD') {
+            steps {
+                script {
+                    sh '''
+                        cd BE-WalletService
+                        chmod 755 gradlew
+                        ./gradlew clean bootjar
+                    '''
+                }
+            }
+        }
+        stage('SCP') {
+            steps {
+                sshagent(credentials: ['jenkins-ssh']) {
+                    sh'''
+                        ssh -o StrictHostKeyChecking=no ubuntu@43.201.50.220 '
+                            uptime
+                            rm -rf /home/ubuntu/scp/be-wallet
+                            mkdir /home/ubuntu/scp/be-wallet
+                        '
+                    '''
+                    sh 'scp -r . ubuntu@43.201.50.220:/home/ubuntu/scp/be-wallet'
+                }
+            }
+        }
+        stage('DEPLOY') {
+            steps {
+                sshagent(credentials: ['jenkins-ssh']) {
+                    sh '''
+                        ssh ubuntu@43.201.50.220 '
+                            export WALLET_SERVICE_PORT=8330
+                            cd /home/ubuntu/scp/be-wallet/BE-WalletService
+                            sh deploy.sh
+                        '
+                    '''
+                }
+            }
+        }
+    }
+    
+}

@@ -1,0 +1,52 @@
+pipeline {
+    agent any
+    
+    stages {
+        stage('CLONE') {
+            steps {
+                script {
+                    git branch: 'infra-dev-eureka', credentialsId: 'jenkins-gitlab', url: 'https://lab.ssafy.com/s10-final/S10P31A503.git'
+                }
+            }
+        }
+        stage('BUILD') {
+            steps {
+                script {
+                    sh '''
+                        cd INFRA-EurekaService
+                        chmod 755 gradlew
+                        ./gradlew clean bootjar
+                    '''
+                }
+            }
+        }
+        stage('SCP') {
+            steps {
+                sshagent(credentials: ['jenkins-ssh']) {
+                    sh'''
+                        ssh -o StrictHostKeyChecking=no ubuntu@43.201.50.220 '
+                            uptime
+                            rm -rf /home/ubuntu/scp/infra-eureka
+                            mkdir /home/ubuntu/scp/infra-eureka
+                        '
+                    '''
+                    sh 'scp -r . ubuntu@43.201.50.220:/home/ubuntu/scp/infra-eureka'
+                }
+            }
+        }
+        stage('DEPLOY') {
+            steps {
+                sshagent(credentials: ['jenkins-ssh']) {
+                    sh '''
+                        ssh ubuntu@43.201.50.220 '
+                            export EUREKA_SERVICE_PORT=8350
+                            cd /home/ubuntu/scp/infra-eureka/INFRA-EurekaService
+                            sh deploy.sh
+                        '
+                    '''
+                }
+            }
+        }
+    }
+    
+}
